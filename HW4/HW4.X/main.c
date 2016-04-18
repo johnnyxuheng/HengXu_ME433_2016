@@ -52,10 +52,11 @@ void DAC_init() {
   // the chip select pin is used by the sram to indicate
   // when a command is beginning (clear CS to low) and when it
   // is ending (set CS high)
+  TRISBbits.TRISB14 = 0;  //use B14 as clock output  
   TRISBbits.TRISB8 = 0;  //use B8 as SS1
   TRISAbits.TRISA0 = 0;  //udr A0 as SDO1
   CS = 1;
-  
+  RPA0Rbits.RPA0R = 0b0011;
   // Master - SPI4, pins are: SDI4(F4), SDO4(F5), SCK4(F13).  
   // we manually control SS4 as a digital output (F12)
   // since the pic is just starting, we know that spi is off. We rely on defaults here
