@@ -38,7 +38,7 @@
 
 #define CS LATBbits.LATB8
 
-unsigned int spi_io(unsigned char o) {
+unsigned char spi_io(unsigned char o) {
   
   SPI1BUF = o;
   while(!SPI1STATbits.SPIRBF) { // wait to receive the byte
@@ -47,16 +47,17 @@ unsigned int spi_io(unsigned char o) {
   return SPI1BUF;
 }
 
-void DAC_init() {
+void DAC_ini() {
   // set up the chip select pin as an output
   // the chip select pin is used by the sram to indicate
   // when a command is beginning (clear CS to low) and when it
   // is ending (set CS high)
   TRISBbits.TRISB14 = 0;  //use B14 as clock output  
-  TRISBbits.TRISB8 = 0;  //use B8 as SS1
-  TRISAbits.TRISA0 = 0;  //udr A0 as SDO1
+  TRISAbits.TRISA0 = 0;  //use A0 as SS1
+  TRISAbits.TRISA1 = 0;  //use A1 as SDO1
   CS = 1;
   RPA0Rbits.RPA0R = 0b0011;
+  RPA1Rbits.RPA1R = 0b0011;
   // Master - SPI4, pins are: SDI4(F4), SDO4(F5), SCK4(F13).  
   // we manually control SS4 as a digital output (F12)
   // since the pic is just starting, we know that spi is off. We rely on defaults here
@@ -77,7 +78,7 @@ void DAC_init() {
 }
 
 // write len bytes to the ram, starting at the address addr
-void DAC_write(const int data[], int len) {
+void DAC_write(const char data[], int len) {
   int i = 0;
   CS = 0;                        // enable the ram by lowering the chip select line
   spi_io(0x2);                   // sequential write operation
@@ -89,8 +90,26 @@ void DAC_write(const int data[], int len) {
   CS = 1;                        // raise the chip select line, ending communication
 }
 
-int main() {
+void setVoltage(char channel, char voltage){    //channel 0 for voutA, 1 for voutB
+    int spi_voltage = 0;
+    if(channel == 0){
+        spi_voltage = 0b0011 << 12 + voltage << 4;
+        CS = 0;                                 // listen to me
+        spi_io((spi_voltage & 0xFF00) >> 8 ); // most significant byte of address
+        spi_io(spi_voltage & 0x00FF);         // the least significant address byte
+        CS = 1;                          // end
+    }
+    if (channel == 1){
+        spi_voltage = 0b1011 << 12 + voltage << 4;
+        CS = 0;
+        spi_io((spi_voltage & 0xFF00) >> 8 ); // most significant byte of address
+        spi_io(spi_voltage & 0x00FF);         // the least significant address byte
+        CS = 1;
+    }
+}
 
+int main() {
+    
     __builtin_disable_interrupts();
 
     // set the CP0 CONFIG register to indicate that kseg0 is cacheable (0x3)
@@ -124,7 +143,7 @@ int main() {
     A_sin=3.3*sin(20*M_PI*A_t);
     B_tri=3.3/0.2*B_t;
     
-    DAC_write((int)A_sin,strlen((int)A_sin)+1);
+    DAC_write((char)A_sin,strlen((int)A_sin)+1);
     while(1) {
         _CP0_SET_COUNT(0);
         //LATAbits.LATA4=0;
