@@ -1,6 +1,9 @@
-#include<xc.h>           // processor SFR definitions
-#include<sys/attribs.h>  // __ISR macro
-#include<math.h>
+#include <xc.h>           // processor SFR definitions
+#include <sys/attribs.h>  // __ISR macro
+#include <math.h>
+#include "spi_dac.h"
+#include "i2c.h"
+
 // DEVCFG0
 #pragma config DEBUG = OFF // no debugging
 #pragma config JTAGEN = OFF // no jtag
@@ -17,7 +20,7 @@
 #pragma config OSCIOFNC = OFF // free up secondary osc pins
 #pragma config FPBDIV = DIV_1 // divide CPU freq by 1 for peripheral bus clock
 #pragma config FCKSM = CSDCMD // do not enable clock switch
-#pragma config WDTPS = PS1 // slowest wdt
+#pragma config WDTPS = PS1048576 // slowest wdt
 #pragma config WINDIS = OFF // no wdt window
 #pragma config FWDTEN = OFF // wdt off by default
 #pragma config FWDTWINSZ = WINSZ_25 // wdt window at 25%
@@ -30,86 +33,89 @@
 #pragma config UPLLEN = ON // USB clock on
 
 // DEVCFG3
-#pragma config USERID = 0 // some 16bit userid, doesn't matter what
+#pragma config USERID = 0xFFFF // some 16bit userid, doesn't matter what
 #pragma config PMDL1WAY = OFF // allow multiple reconfigurations
 #pragma config IOL1WAY = OFF // allow multiple reconfigurations
 #pragma config FUSBIDIO = ON // USB pins controlled by USB module
 #pragma config FVBUSONIO = ON // USB BUSON controlled by USB module
 
-#define CS LATBbits.LATB8
+#define CS LATBbits.LATB7       // chip select pin
 
-unsigned char spi_io(unsigned char o) {
-  
-  SPI1BUF = o;
-  while(!SPI1STATbits.SPIRBF) { // wait to receive the byte
-    ;
-  }
-  return SPI1BUF;
+//int value = 0;
+int sinewave[100];
+int triangle_wave[200];
+
+
+void initExpander(void){    // GP0-3 outputs and GP4-7 inputs
+  i2c_master_start();
+  i2c_master_send(0x40);   // GPIO address & indicate write
+  i2c_master_send(0x00);   // addr of I/O direction register
+  i2c_master_send(0xF0);   // send the value to the register. 0-3outputs 4-7 inputs
+  i2c_master_stop();
 }
 
-void DAC_ini() {
-  // set up the chip select pin as an output
-  // the chip select pin is used by the sram to indicate
-  // when a command is beginning (clear CS to low) and when it
-  // is ending (set CS high)
-  TRISBbits.TRISB14 = 0;  //use B14 as clock output  
-  TRISAbits.TRISA0 = 0;  //use A0 as SS1
-  TRISAbits.TRISA1 = 0;  //use A1 as SDO1
-  CS = 1;
-  RPA0Rbits.RPA0R = 0b0011;
-  RPA1Rbits.RPA1R = 0b0011;
-  // Master - SPI4, pins are: SDI4(F4), SDO4(F5), SCK4(F13).  
-  // we manually control SS4 as a digital output (F12)
-  // since the pic is just starting, we know that spi is off. We rely on defaults here
- 
-  // setup spi4
-  SPI1CON = 0;              // turn off the spi module and reset it
-  SPI1BUF;                  // clear the rx buffer by reading from it
-  SPI1BRG = 0x3;            // baud rate to 6 MHz [SPI4BRG = (48000000/(2*desired))-1]
-  SPI1STATbits.SPIROV = 0;  // clear the overflow bit
-  SPI1CONbits.CKE = 1;      // data changes when clock goes from hi to lo (since CKP is 0)
-  SPI1CONbits.MSTEN = 1;    // master operation
-  SPI1CONbits.ON = 1;       // turn on spi 1
-                            // send a ram set status command.
-  //CS = 0;                   // enable the ram
-  //spi_io(0x01);             // ram write status
-  //spi_io(0x41);             // sequential mode (mode = 0b01), hold disabled (hold = 0)
-  //CS = 1;                   // finish the command
-}
-
-// write len bytes to the ram, starting at the address addr
-void DAC_write(const char data[], int len) {
-  int i = 0;
-  CS = 0;                        // enable the ram by lowering the chip select line
-  spi_io(0x2);                   // sequential write operation
-  //spi_io((addr & 0xFF00) >> 8 ); // most significant byte of address
-  //spi_io(addr & 0x00FF);         // the least significant address byte
-  for(i = 0; i < len; ++i) {
-    spi_io(data[i]);
-  }
-  CS = 1;                        // raise the chip select line, ending communication
-}
-
-void setVoltage(char channel, char voltage){    //channel 0 for voutA, 1 for voutB
-    int spi_voltage = 0;
+void setVoltage(unsigned char channel, unsigned char voltage){    //channel 0 for voutA, 1 for voutB
+    unsigned short value = 0;
     if(channel == 0){
-        spi_voltage = 0b0011 << 12 + voltage << 4;
+      value = (0b0011 << 12) + (voltage << 4);
         CS = 0;                                 // listen to me
-        spi_io((spi_voltage & 0xFF00) >> 8 ); // most significant byte of address
-        spi_io(spi_voltage & 0x00FF);         // the least significant address byte
+        SPI1_IO((value & 0xFF00) >> 8 ); // most significant byte of address
+        SPI1_IO(value & 0x00FF);         // the least significant address byte
         CS = 1;                          // end
     }
     if (channel == 1){
-        spi_voltage = 0b1011 << 12 + voltage << 4;
+      value = (0b1011 << 12) + (voltage << 4);
         CS = 0;
-        spi_io((spi_voltage & 0xFF00) >> 8 ); // most significant byte of address
-        spi_io(spi_voltage & 0x00FF);         // the least significant address byte
+        SPI1_IO((value & 0xFF00) >> 8 ); // most significant byte of address
+        SPI1_IO(value & 0x00FF);         // the least significant address byte
         CS = 1;
     }
 }
 
+char getExpander(void){ // read from GP7
+  i2c_master_start();
+  i2c_master_send(0x40);
+  i2c_master_send(0x09);  // the register to read from (GPIO)
+  i2c_master_restart();   // make the restart bit, so we can begin reading
+  i2c_master_send(0x41); // indicate reading
+  unsigned char read = i2c_master_recv() >> 7;     // save the value returned. the value of GP7
+  i2c_master_ack(1); // make the ack so the slave knows we got it
+  i2c_master_stop(); // make the stop bit
+  //read = 1;
+  return read;
+}
+
+void setExpander(char pin, char level){ // set GP0
+  i2c_master_start();
+  i2c_master_send(0x40);   // GPIO address & indicate write
+  i2c_master_send(0x0A);   // addr of OLAT register
+  //i2c_master_send(0x01);
+  if(level == 1){
+    i2c_master_send(0x01);   // send '1' to GP0, indicating high level.
+  }
+  if(level == 0){
+    i2c_master_send(0x00);
+  }
+  i2c_master_stop();
+}
+
+void waveGenerator(void){
+  int i;
+  for(i = 0; i < 100; i++){
+    sinewave[i] = (int)(128.0 + 127.5 * sin(M_PI * 0.02 * i));
+  }
+  for(i = 0; i < 200; i++){
+    triangle_wave[i] = (int)(1.28 * i);
+  }
+}
+
+
 int main() {
-    
+    //int value = 0;
+    char data;
+    waveGenerator();
+    int count1 = 0;
+    int count2 = 0;
     __builtin_disable_interrupts();
 
     // set the CP0 CONFIG register to indicate that kseg0 is cacheable (0x3)
@@ -125,41 +131,38 @@ int main() {
     DDPCONbits.JTAGEN = 0;
     
     // do your TRIS and LAT commands here
+    TRISAbits.TRISA4 = 0;     // ouput
+    TRISBbits.TRISB4 = 1;     // input
+
+    LATAbits.LATA4 = 1;       // intialize LED on
+    initSPI1();
+    initI2C2();
+    initExpander();
     
     __builtin_enable_interrupts();
-    //TRISAbits.TRISA4 = 0;     // set B4-B7 as digital outputs, 0-3 as digital inputs
-    //TRISBbits.TRISB4 = 1;
     
-    
-    double A_sin=0;
-    double A_t=0;
-    int A_bit=0;
-    double B_tri=0;
-    double B_t=0;
-    int B_bit=0;
-    
-    
-    
-    A_sin=3.3*sin(20*M_PI*A_t);
-    B_tri=3.3/0.2*B_t;
-    
-    DAC_write((char)A_sin,strlen((int)A_sin)+1);
     while(1) {
-        _CP0_SET_COUNT(0);
-        //LATAbits.LATA4=0;
-        while(_CP0_GET_COUNT()<12000){
-        }
-        _CP0_SET_COUNT(0);
-        //LATAbits.LATA4=1;
-        while(_CP0_GET_COUNT()<12000){
-            ;
-        }
-        while (PORTBbits.RB4==0){
-            ;
-        }     
 	    // use _CP0_SET_COUNT(0) and _CP0_GET_COUNT() to test the PIC timing
 		// remember the core timer runs at half the CPU speed
-    }
-    
+        _CP0_SET_COUNT(0);                   // set core timer to 0
+        
+        setVoltage(0,sinewave[count1]);
+        setVoltage(1,triangle_wave[count2]);
+        count1++;
+        count2++;
+        if(count1 == 100){
+          count1 = 0;
+        }
+        if(count2 == 200){
+          count2 = 0;
+        }
+        data = getExpander();
+        setExpander(0,data);
+        
+        while(_CP0_GET_COUNT() < 24000){     // wait 1ms / 0.001s
+            ;
+        }
+
+    }  
     
 }
