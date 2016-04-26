@@ -40,7 +40,7 @@
 
 
 unsigned char data_IMU[14];
-unsigned short temperature, gyroX, gyroY, gyroZ, accelX, accelY, accelZ;
+signed short temperature, gyroX, gyroY, gyroZ, accelX, accelY, accelZ;
 int i;
 
 int main() {
@@ -63,7 +63,9 @@ int main() {
     // do your TRIS and LAT commands here
     TRISAbits.TRISA4 = 0;     // ouput
     TRISBbits.TRISB4 = 1;     // input
-
+    int testa;
+    int testb;
+    
     initI2C2();
     init_ctrl1();
     init_ctrl2();
@@ -87,18 +89,48 @@ int main() {
         accelY = data_IMU[10] << 8 | data_IMU[11];
         accelZ = data_IMU[12] << 8 | data_IMU[13];
         
-        int test=65536;
+//        int test1=0;
+//        int test2=20000;
         
-        if (accelX > test || accelY > test){
-            OC1RS = 12000;
-            OC2RS = 12000;
+        int testa= (short)accelX;
+        int testb= (short)accelY;
+        
+        if ((testa >= 0)){
             LATAbits.LATA4 = 0;
         }
-        if (accelX <= test && accelY <= test){
+        if ((testa<0)){
             LATAbits.LATA4 = 1;
-            OC1RS = (int)(accelX/50000*12000);
-            OC2RS = (int)(accelY/50000*12000);
         }
+//        if ((testa > test1 && testa < test2) || (testa > (32767+test1) && testa < (32767+test2))){
+//            LATAbits.LATA4 = 0;
+//        }
+//        else {
+//            LATAbits.LATA4 = 1;
+//        }
+        OC1RS=(int)(6000.0+(float)testa/32767.0*12000.0);
+        OC2RS=(int)(6000.0+(float)testb/32767.0*12000.0);
+//        if (testa <= 32767){
+//            OC1RS=(int)(6000.0+testa/32767.0*6000.0);
+//        }
+//        if (testa > 32767){
+//            OC1RS=(int)(6000.0+(32768.0-accelX)/32767.0*6000.0);
+//        }
+//        
+        
+//        if (accelX <= 32767){
+//            OC1RS=(int)(6000.0+accelX/32767.0*6000.0);
+//        }
+//        if (accelX > 32767){
+//            OC1RS=(int)(6000.0+(32768.0-accelX)/32767.0*6000.0);
+//        }
+        
+//        if (accelY <= 32767){
+//            OC2RS=(int)(6000.0+accelY/32767.0*6000.0);
+//        }
+//        if (accelY > 32767){
+//            OC2RS=(int)(6000.0+(32768.0-accelY)/32767.0*6000.0);
+//        }
+        
         
         
         for (i=0;i<20;i++){
