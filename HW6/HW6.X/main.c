@@ -87,18 +87,17 @@ int main() {
         accelY = data_IMU[10] << 8 | data_IMU[11];
         accelZ = data_IMU[12] << 8 | data_IMU[13];
         
-        if (accelX < 49152){
-//            OC1RS=0;
-//            OC2RS=0;
-            OC1RS=0;
-            OC2RS=0;
-            LATAbits.LATA4 = 1;
-        }
-        if (accelX >= 49152){
-            OC1RS=12000;
-            OC2RS=12000;
-            
+        int test=65536;
+        
+        if (accelX > test || accelY > test){
+            OC1RS = 12000;
+            OC2RS = 12000;
             LATAbits.LATA4 = 0;
+        }
+        if (accelX <= test && accelY <= test){
+            LATAbits.LATA4 = 1;
+            OC1RS = (int)(accelX/50000*12000);
+            OC2RS = (int)(accelY/50000*12000);
         }
         
         
@@ -107,10 +106,7 @@ int main() {
                 ;
             }
             _CP0_SET_COUNT(0);
-        }
-        //OC1RS < 0 || OC2RS < 0
-        //OC1RS = accelX/32768*12000;
-        //OC2RS = accelY/32768*12000;
+        }      
         
 
         
