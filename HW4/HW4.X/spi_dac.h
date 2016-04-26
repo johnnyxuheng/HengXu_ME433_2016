@@ -1,5 +1,5 @@
-#ifndef SPI_DAC__
-#define SPI_DAC__
+#ifndef SPI_DAC_
+#define SPI_DAC_
 
 void initSPI1(void);
 char SPI1_IO(char write);

@@ -1,5 +1,5 @@
-#ifndef I2C__
-#define I2C__
+#ifndef I2C_
+#define I2C_
 
 void initI2C2(void);              // set up I2C2 as a master, at 100 kHz
 void i2c_master_start(void);              // send a START signal

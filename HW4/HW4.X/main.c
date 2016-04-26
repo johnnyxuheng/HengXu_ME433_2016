@@ -41,7 +41,7 @@
 
 #define CS LATBbits.LATB7       // chip select pin
 
-//int value = 0;
+
 int sinewave[100];
 int triangle_wave[200];
 
@@ -73,12 +73,15 @@ void setVoltage(unsigned char channel, unsigned char voltage){    //channel 0 fo
 }
 
 char getExpander(void){ // read from GP7
+  
   i2c_master_start();
   i2c_master_send(0x40);
   i2c_master_send(0x09);  // the register to read from (GPIO)
   i2c_master_restart();   // make the restart bit, so we can begin reading
   i2c_master_send(0x41); // indicate reading
+  
   unsigned char read = i2c_master_recv() >> 7;     // save the value returned. the value of GP7
+  
   i2c_master_ack(1); // make the ack so the slave knows we got it
   i2c_master_stop(); // make the stop bit
   //read = 1;
@@ -86,16 +89,19 @@ char getExpander(void){ // read from GP7
 }
 
 void setExpander(char pin, char level){ // set GP0
+  
   i2c_master_start();
   i2c_master_send(0x40);   // GPIO address & indicate write
   i2c_master_send(0x0A);   // addr of OLAT register
-  //i2c_master_send(0x01);
+
   if(level == 1){
+    //LATAbits.LATA4 = 0;
     i2c_master_send(0x01);   // send '1' to GP0, indicating high level.
   }
   if(level == 0){
     i2c_master_send(0x00);
   }
+  //i2c_master_send(0x0F);
   i2c_master_stop();
 }
 
@@ -134,7 +140,7 @@ int main() {
     TRISAbits.TRISA4 = 0;     // ouput
     TRISBbits.TRISB4 = 1;     // input
 
-    LATAbits.LATA4 = 1;       // intialize LED on
+    //LATAbits.LATA4 = 1;       // intialize LED on
     initSPI1();
     initI2C2();
     initExpander();
@@ -145,7 +151,7 @@ int main() {
 	    // use _CP0_SET_COUNT(0) and _CP0_GET_COUNT() to test the PIC timing
 		// remember the core timer runs at half the CPU speed
         _CP0_SET_COUNT(0);                   // set core timer to 0
-        
+        LATAbits.LATA4 = 1;       // intialize LED on
         setVoltage(0,sinewave[count1]);
         setVoltage(1,triangle_wave[count2]);
         count1++;
@@ -157,6 +163,7 @@ int main() {
           count2 = 0;
         }
         data = getExpander();
+        //data = (char)0x01;
         setExpander(0,data);
         
         while(_CP0_GET_COUNT() < 24000){     // wait 1ms / 0.001s

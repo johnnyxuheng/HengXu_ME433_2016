@@ -24,14 +24,18 @@ void i2c_master_restart(void) {
 void i2c_master_send(unsigned char byte) { // send a byte to slave
   I2C2TRN = byte;                   // if an address, bit 0 = 0 for write, 1 for read
   while(I2C2STATbits.TRSTAT) { ; }  // wait for the transmission to finish
+  
   if(I2C2STATbits.ACKSTAT) {        // if this is high, slave has not acknowledged
-    // ("I2C2 Master: failed to receive ACK\r\n");
+    
+      // ("I2C2 Master: failed to receive ACK\r\n");
   }
 }
 
 unsigned char i2c_master_recv(void) { // receive a byte from the slave
+    
     I2C2CONbits.RCEN = 1;             // start receiving data
     while(!I2C2STATbits.RBF) { ; }    // wait to receive the data
+    
     return I2C2RCV;                   // read and return the data
 }
 
