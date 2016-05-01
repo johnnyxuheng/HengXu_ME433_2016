@@ -2,6 +2,7 @@
 #include <sys/attribs.h>  // __ISR macro
 #include <math.h>
 #include "i2c.h"
+#include "imu.h"
 
 // DEVCFG0
 #pragma config DEBUG = OFF // no debugging
@@ -39,8 +40,8 @@
 #pragma config FVBUSONIO = ON // USB BUSON controlled by USB module
 
 
-unsigned char data_IMU[14];
-signed short temperature, gyroX, gyroY, gyroZ, accelX, accelY, accelZ;
+short data_IMU[14];
+short temperature, gyroX, gyroY, gyroZ, accelX, accelY, accelZ;
 int i;
 
 int main() {
@@ -63,8 +64,7 @@ int main() {
     // do your TRIS and LAT commands here
     TRISAbits.TRISA4 = 0;     // ouput
     TRISBbits.TRISB4 = 1;     // input
-    int testa;
-    int testb;
+    
     
     initI2C2();
     init_ctrl1();
@@ -81,68 +81,25 @@ int main() {
         
         I2C_read_multipleLine(0x6B, 0x20, data_IMU, 14);
         
-        temperature = data_IMU[0] << 8 | data_IMU[1];
-        gyroX = data_IMU[2] << 8 | data_IMU[3];
-        gyroY = data_IMU[4] << 8 | data_IMU[5];
-        gyroZ = data_IMU[6] << 8 | data_IMU[7];
-        accelX = data_IMU[8] << 8 | data_IMU[9];
-        accelY = data_IMU[10] << 8 | data_IMU[11];
-        accelZ = data_IMU[12] << 8 | data_IMU[13];
-        
-//        int test1=0;
-//        int test2=20000;
-        
-        int testa= (short)accelX;
-        int testb= (short)accelY;
-        
-        if ((testa >= 0)){
-            LATAbits.LATA4 = 0;
-        }
-        if ((testa<0)){
-            LATAbits.LATA4 = 1;
-        }
-//        if ((testa > test1 && testa < test2) || (testa > (32767+test1) && testa < (32767+test2))){
-//            LATAbits.LATA4 = 0;
-//        }
-//        else {
-//            LATAbits.LATA4 = 1;
-//        }
-        OC1RS=(int)(6000.0+(float)testa/32767.0*12000.0);
-        OC2RS=(int)(6000.0+(float)testb/32767.0*12000.0);
-//        if (testa <= 32767){
-//            OC1RS=(int)(6000.0+testa/32767.0*6000.0);
-//        }
-//        if (testa > 32767){
-//            OC1RS=(int)(6000.0+(32768.0-accelX)/32767.0*6000.0);
-//        }
-//        
-        
-//        if (accelX <= 32767){
-//            OC1RS=(int)(6000.0+accelX/32767.0*6000.0);
-//        }
-//        if (accelX > 32767){
-//            OC1RS=(int)(6000.0+(32768.0-accelX)/32767.0*6000.0);
-//        }
-        
-//        if (accelY <= 32767){
-//            OC2RS=(int)(6000.0+accelY/32767.0*6000.0);
-//        }
-//        if (accelY > 32767){
-//            OC2RS=(int)(6000.0+(32768.0-accelY)/32767.0*6000.0);
-//        }
-        
-        
-        
+        temperature = data_IMU[1] << 8 | data_IMU[0];
+        gyroX = data_IMU[3] << 8 | data_IMU[2];
+        gyroY = data_IMU[5] << 8 | data_IMU[4];
+        gyroZ = data_IMU[7] << 8 | data_IMU[6];
+        accelX = data_IMU[9] << 8 | data_IMU[8];
+        accelY = data_IMU[11] << 8 | data_IMU[10];
+        accelZ = data_IMU[13] << 8 | data_IMU[12];
+
+        LATAbits.LATA4 = 0;
+
+        OC1RS=(int)(6000.0+accelX/32767.0*12000.0);
+        OC2RS=(int)(6000.0+accelY/32767.0*12000.0);
+
         for (i=0;i<20;i++){
             while(_CP0_GET_COUNT() < 48000){     // wait 1ms / 0.001s
                 ;
             }
             _CP0_SET_COUNT(0);
         }      
-        
-
-        
-
     }  
     
 }

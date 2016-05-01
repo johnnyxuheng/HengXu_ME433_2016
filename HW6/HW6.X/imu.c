@@ -47,16 +47,13 @@ void init_ctrl3(void){
     i2c_master_stop();
 }
 
-void I2C_read_multipleLine(char address, char register_addr, unsigned char * data, char length){
-    //char data2;
+void I2C_read_multipleLine(char address, char register_addr, short * data, char length){
     int j;
     i2c_master_start();
     i2c_master_send(address << 1 | 0);   // chip address & indicate write
     i2c_master_send(register_addr);   // addr of OUT_TEMP_L register
-    //i2c_master_send(0x0F);
     i2c_master_restart();   // make the restart bit, so we can begin reading
     i2c_master_send(address << 1 | 1);   // chip address & indicate reading
-    //data2=i2c_master_recv();
     for(j = 0; j < length - 1; j++){
         *(data + j) = i2c_master_recv();
         i2c_master_ack(0); // make the ack so the slave knows we got it
@@ -64,8 +61,6 @@ void I2C_read_multipleLine(char address, char register_addr, unsigned char * dat
     *(data + length) = i2c_master_recv();
     i2c_master_ack(1);
     i2c_master_stop(); // make the stop bit
-//    if (data2==0b01101001){
-//        LATAbits.LATA4 = 0;
-//    }
+
     
 }
